@@ -16,26 +16,29 @@
  */
 package net.playeranalytics.plan.gathering.listeners.events.mixin;
 
-import net.minecraft.network.packet.c2s.play.CommandExecutionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraftforge.common.MinecraftForge;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnCommandEvent;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnMoveEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ServerPlayNetworkHandler.class)
+@Mixin(ServerGamePacketListenerImpl.class)
 public class ServerPlayNetworkHandlerMixin {
 
-    @Inject(method = "onCommandExecution", at = @At("TAIL"))
-    public void onCommand(CommandExecutionC2SPacket packet, CallbackInfo ci) {
-        PlanForgeEvents.ON_COMMAND.invoker().onCommand((ServerPlayNetworkHandler) (Object) this, packet.command());
+    @Inject(method = "handleChatCommand", at = @At("TAIL"))
+    public void onCommand(ServerboundChatCommandPacket packet, CallbackInfo ci) {
+        MinecraftForge.EVENT_BUS.post(new OnCommandEvent((ServerGamePacketListenerImpl) (Object) this, packet.command()));
     }
 
-    @Inject(method = "onPlayerMove", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayerEntity;getServerWorld()Lnet/minecraft/server/world/ServerWorld;"))
-    public void onPlayerMove(PlayerMoveC2SPacket packet, CallbackInfo ci) {
-        PlanForgeEvents.ON_MOVE.invoker().onMove((ServerPlayNetworkHandler) (Object) this, packet);
+    @Inject(method = "handleMovePlayer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerPlayer;getLevel()Lnet/minecraft/server/level/ServerLevel;"))
+    public void onPlayerMove(ServerboundMovePlayerPacket packet, CallbackInfo ci) {
+        MinecraftForge.EVENT_BUS.post(new OnMoveEvent((ServerGamePacketListenerImpl) (Object) this, packet));
     }
 
 }

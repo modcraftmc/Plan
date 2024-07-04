@@ -31,8 +31,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.MinecraftForge;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnKilledEvent;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -65,45 +67,47 @@ public class DeathEventListener implements ForgeListener {
             return;
         }
 
-        ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, killer, killedEntity) ->
-                {
-                    if (!this.isEnabled) {
-                        return;
-                    }
-                    PlanForgeEvents.ON_KILLED.invoker().onKilled(killedEntity, killer);
-                }
-        );
+//        ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.register((world, killer, killedEntity) ->
+//                {
+//                    if (!this.isEnabled) {
+//                        return;
+//                    }
+//                    PlanForgeEvents.ON_KILLED.invoker().onKilled(killedEntity, killer);
+//                }
+//        );
 
-        PlanForgeEvents.ON_KILLED.register((victim, killer) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            long time = System.currentTimeMillis();
-            if (victim instanceof ServerPlayer) {
-                // Process Death
-                SessionCache.getCachedSession(victim.getUuid()).ifPresent(ActiveSession::addDeath);
-            }
-
-            try {
-                Optional<ServerPlayer> foundKiller = getCause(killer);
-                if (foundKiller.isEmpty()) {
-                    return;
-                }
-
-                ServerPlayer player = foundKiller.get();
-
-                Runnable processor = victim instanceof ServerPlayer
-                        ? new PlayerKillProcessor(getKiller(player), getVictim((ServerPlayer) victim), serverInfo.getServerIdentifier(), findWeapon(player), time)
-                        : new MobKillProcessor(player.getUuid());
-                processing.submitCritical(processor);
-            } catch (Exception | NoSuchMethodError e) {
-                errorLogger.error(e, ErrorContext.builder().related(getClass(), victim, killer).build());
-            }
-
-        });
+        MinecraftForge.EVENT_BUS.addListener(this::onKilled);
 
         this.enable();
         this.wasRegistered = true;
+    }
+
+    private void onKilled(OnKilledEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
+        long time = System.currentTimeMillis();
+        if (event.killed() instanceof ServerPlayer) {
+            // Process Death
+            SessionCache.getCachedSession(event.killed().getUUID()).ifPresent(ActiveSession::addDeath);
+        }
+
+        try {
+            Optional<ServerPlayer> foundKiller = getCause(event.killer());
+            if (foundKiller.isEmpty()) {
+                return;
+            }
+
+            ServerPlayer player = foundKiller.get();
+
+            Runnable processor = event.killed() instanceof ServerPlayer
+                    ? new PlayerKillProcessor(getKiller(player), getVictim((ServerPlayer) event.killed()), serverInfo.getServerIdentifier(), findWeapon(player), time)
+                    : new MobKillProcessor(player.getUUID());
+            processing.submitCritical(processor);
+        } catch (Exception | NoSuchMethodError e) {
+            errorLogger.error(e, ErrorContext.builder().related(getClass(), event.killed(), event.killer()).build());
+        }
+
     }
 
     private PlayerKill.Killer getKiller(ServerPlayer killer) {

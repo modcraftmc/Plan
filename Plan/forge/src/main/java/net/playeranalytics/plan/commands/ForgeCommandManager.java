@@ -30,11 +30,10 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import me.lucko.fabric.api.permissions.v0.Permissions;
-import net.minecraft.command.CommandSource;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.Component;
 import net.playeranalytics.plan.PlanForge;
 import net.playeranalytics.plugin.scheduling.RunnableFactory;
 
@@ -42,22 +41,20 @@ import java.util.concurrent.CompletableFuture;
 
 public class ForgeCommandManager {
 
-    private final CommandDispatcher<ServerCommandSource> dispatcher;
+    private final CommandDispatcher<CommandSourceStack> dispatcher;
     private RunnableFactory runnableFactory;
-    private LiteralArgumentBuilder<ServerCommandSource> root;
+    private LiteralArgumentBuilder<CommandSourceStack> root;
     private final PlanForge plugin;
     private final ErrorLogger errorLogger;
 
-    public ForgeCommandManager(CommandDispatcher<ServerCommandSource> dispatcher, PlanForge plugin, ErrorLogger errorLogger) {
+    public ForgeCommandManager(CommandDispatcher<CommandSourceStack> dispatcher, PlanForge plugin, ErrorLogger errorLogger) {
         this.dispatcher = dispatcher;
         this.plugin = plugin;
         this.errorLogger = errorLogger;
     }
 
-    public static boolean checkPermission(ServerCommandSource src, String permission) {
-        if (isPermissionsApiAvailable()) {
-            return Permissions.check(src, permission, 2);
-        } else if (src.hasPermissionLevel(2)) {
+    public static boolean checkPermission(CommandSourceStack src, String permission) {
+        if (src.hasPermission(2)) {
             return true;
         } else {
             return switch (permission) {
@@ -77,18 +74,18 @@ public class ForgeCommandManager {
         }
     }
 
-    public CompletableFuture<Suggestions> arguments(final Subcommand subcommand, final CommandContext<ServerCommandSource> ctx, final SuggestionsBuilder builder) {
-        return CommandSource.suggestMatching(subcommand.getArgumentResolver().apply((CMDSender) ctx.getSource(), new Arguments(new String[0])), builder);
+    public CompletableFuture<Suggestions> arguments(final Subcommand subcommand, final CommandContext<CommandSourceStack> ctx, final SuggestionsBuilder builder) {
+        return SharedSuggestionProvider.suggest(subcommand.getArgumentResolver().apply((CMDSender) ctx.getSource(), new Arguments(new String[0])), builder);
     }
 
-    private int execute(CommandContext<ServerCommandSource> ctx, Subcommand subcommand) {
+    private int execute(CommandContext<CommandSourceStack> ctx, Subcommand subcommand) {
         runnableFactory.create(() -> {
             try {
                 subcommand.getExecutor().accept((CMDSender) ctx.getSource(), new Arguments(getCommandArguments(ctx)));
             } catch (IllegalArgumentException e) {
-                ctx.getSource().sendError(Text.literal(e.getMessage()));
+                ctx.getSource().sendFailure(Component.literal(e.getMessage()));
             } catch (Exception e) {
-                ctx.getSource().sendError(Text.literal("An internal error occurred, see the console for details."));
+                ctx.getSource().sendFailure(Component.literal("An internal error occurred, see the console for details."));
                 errorLogger.error(e, ErrorContext.builder()
                         .related(ctx.getSource().getClass())
                         .related(subcommand.getPrimaryAlias() + " " + getCommandArguments(ctx))
@@ -98,7 +95,7 @@ public class ForgeCommandManager {
         return 1;
     }
 
-    private String getCommandArguments(CommandContext<ServerCommandSource> ctx) {
+    private String getCommandArguments(CommandContext<CommandSourceStack> ctx) {
         String arguments;
         try {
             arguments = StringArgumentType.getString(ctx, "arguments");
@@ -123,9 +120,9 @@ public class ForgeCommandManager {
         build();
     }
 
-    public void registerChild(Subcommand subcommand, ArgumentBuilder<ServerCommandSource, ?> parent) {
+    public void registerChild(Subcommand subcommand, ArgumentBuilder<CommandSourceStack, ?> parent) {
         for (String alias : subcommand.getAliases()) {
-            LiteralArgumentBuilder<ServerCommandSource> argumentBuilder = buildCommand(subcommand, alias);
+            LiteralArgumentBuilder<CommandSourceStack> argumentBuilder = buildCommand(subcommand, alias);
             if (subcommand instanceof CommandWithSubcommands withSubcommands) {
                 for (Subcommand cmd : withSubcommands.getSubcommands()) {
                     registerChild(cmd, argumentBuilder);
@@ -135,11 +132,11 @@ public class ForgeCommandManager {
         }
     }
 
-    private LiteralArgumentBuilder<ServerCommandSource> buildCommand(Subcommand subcommand, String alias) {
-        RequiredArgumentBuilder<ServerCommandSource, String> arguments = CommandManager.argument("arguments", StringArgumentType.greedyString());
+    private LiteralArgumentBuilder<CommandSourceStack> buildCommand(Subcommand subcommand, String alias) {
+        RequiredArgumentBuilder<CommandSourceStack, String> arguments = Commands.argument("arguments", StringArgumentType.greedyString());
         arguments = arguments.suggests((context, builder) -> arguments(subcommand, context, builder))
                 .executes(ctx -> execute(ctx, subcommand));
-        LiteralArgumentBuilder<ServerCommandSource> builder = CommandManager.literal(alias);
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(alias);
         return builder
                 .executes(ctx -> execute(ctx, subcommand))
                 .requires(src -> {

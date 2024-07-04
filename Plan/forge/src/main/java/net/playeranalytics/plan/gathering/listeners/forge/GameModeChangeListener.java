@@ -26,8 +26,10 @@ import com.djrapitops.plan.utilities.logging.ErrorContext;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
+import net.minecraftforge.common.MinecraftForge;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnGamemodeChangeEvent;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -63,11 +65,14 @@ public class GameModeChangeListener implements ForgeListener {
         this.errorLogger = errorLogger;
     }
 
-    public void onGameModeChange(ServerPlayer player, GameType newGameMode) {
+    public void onGameModeChange(OnGamemodeChangeEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
         try {
-            actOnEvent(player, newGameMode);
+            actOnEvent(event.serverPlayer(), event.gameType());
         } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(getClass(), player, newGameMode).build());
+            errorLogger.error(e, ErrorContext.builder().related(getClass(), event.serverPlayer(), event.gameType()).build());
         }
     }
 
@@ -90,12 +95,7 @@ public class GameModeChangeListener implements ForgeListener {
             return;
         }
 
-        PlanForgeEvents.ON_GAMEMODE_CHANGE.register((player, newGameMode) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            this.onGameModeChange(player, newGameMode);
-        });
+        MinecraftForge.EVENT_BUS.addListener(this::onGameModeChange);
 
         this.enable();
         this.wasRegistered = true;

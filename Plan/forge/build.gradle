@@ -1,0 +1,214 @@
+plugins {
+    id 'net.minecraftforge.gradle' version '6+'
+}
+
+minecraft {
+    // The mappings can be changed at any time and must be in the following format.
+    // Channel:   Version:
+    // official   MCVersion             Official field/method names from Mojang mapping files
+    // parchment  YYYY.MM.DD-MCVersion  Open community-sourced parameter names and javadocs layered on top of official
+    //
+    // You must be aware of the Mojang license when using the 'official' or 'parchment' mappings.
+    // See more information here: https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
+    //
+    // Parchment is an unofficial project maintained by ParchmentMC, separate from MinecraftForge
+    // Additional setup is needed to use their mappings: https://parchmentmc.org/docs/getting-started
+    //
+    // Use non-default mappings at your own risk. They may not always work.
+    // Simply re-run your setup task after changing the mappings to update your workspace.
+    mappings channel: 'official', version: '1.19.2'
+
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    // Default run configurations.
+    // These can be tweaked, removed, or duplicated as needed.
+    runs {
+        client {
+            workingDirectory project.file('run')
+
+            // Recommended logging data for a userdev environment
+            // The markers can be added/remove as needed separated by commas.
+            // "SCAN": For mods scan.
+            // "REGISTRIES": For firing of registry events.
+            // "REGISTRYDUMP": For getting the contents of all registries.
+            property 'forge.logging.markers', 'REGISTRIES'
+
+
+            // Recommended logging level for the console
+            // You can set various levels here.
+            // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
+            property 'forge.logging.console.level', 'debug'
+
+            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
+            property 'forge.enabledGameTestNamespaces', 'ModcraftMod'
+
+            mods {
+                modcraftmodreborn {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+
+            property 'forge.logging.console.level', 'debug'
+
+            property 'forge.enabledGameTestNamespaces', 'ModcraftMod'
+
+            mods {
+                modcraftmodreborn {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        // This run config launches GameTestServer and runs all registered gametests, then exits.
+        // By default, the server will crash when no gametests are provided.
+        // The gametest system is also enabled by default for other run configs under the /test command.
+        gameTestServer {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+
+            property 'forge.logging.console.level', 'debug'
+
+            property 'forge.enabledGameTestNamespaces', 'ModcraftMod'
+
+            mods {
+                modcraftmodreborn {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+
+            property 'forge.logging.console.level', 'debug'
+
+            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+            args '--mod', 'modcraftmod', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+
+            mods {
+                modcraftmodreborn {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    shadow project(path: ":api")
+    shadow project(path: ":extensions")
+    shadow project(path: ":common")
+    shadow project(path: ":common", configuration: "swaggerJson")
+
+    shadow "net.playeranalytics:platform-abstraction-layer-api:$palVersion"
+
+    minecraft "net.minecraftforge:forge:1.19.2-43.4.0"
+    testImplementation project(path: ":common", configuration: 'testArtifacts')
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release.set(21)
+}
+
+processResources {
+    inputs.property "version", project.ext.fullVersion
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.ext.fullVersionSemantic
+    }
+}
+
+shadowJar {
+    configurations = [project.configurations.shadow]
+
+    from findProject(':extensions:adventure').tasks.shadowJar.archiveFile
+
+    exclude('net.fabricmc:*')
+    exclude('/mappings/')
+
+    // Exclude these files
+    exclude "**/*.svg"
+    exclude "**/*.psd"
+    exclude "**/*.map"
+    exclude "LICENSE*.txt"
+    exclude "jetty-dir.css"
+
+    exclude "**/module-info.class"
+    exclude "module-info.class"
+    exclude 'META-INF/versions/' // Causes Sponge to crash
+    exclude 'mozilla/**/*'
+
+    // Exclude extra dependencies
+    exclude 'org/apache/http/**/*' // Unnecessary http client depended on by geolite2 implementation
+    exclude "org/junit/**/*" // see extensions/build.gradle
+    exclude "org/opentest4j/**/*" // see extensions/build.gradle
+    exclude "org/checkerframework/**/*" // Dagger compiler
+    exclude "com/google/common/**/*"
+    exclude "com/google/thirdparty/**/*"
+    // Exclude swagger
+    exclude "org/yaml/**/*"
+    exclude "nonapi/**/*"
+    exclude "io/github/classgraph/**/*"
+    exclude "io/swagger/**/*"
+    exclude "com/sun/activation/**/*"
+    exclude "jakarta/activation/**/*"
+    exclude "jakarta/validation/**/*"
+    exclude "jakarta/ws/**/*"
+    exclude "jakarta/xml/**/*"
+    exclude "javassist/**/*"
+
+    relocate('org.apache', 'plan.org.apache') {
+        exclude 'org/apache/logging/**'
+    }
+    relocate 'dagger', 'plan.dagger'
+    // Don't relocate MySQL or SQLite since they are loaded with a isolated class loader
+    // relocate 'org.sqlite', 'plan.org.sqlite'
+    // relocate 'com.mysql', 'plan.com.mysql'
+    // relocate 'com.google.protobuf', 'plan.com.mysql.cj.x.google.protobuf'
+    relocate 'javax.inject', 'plan.javax.inject'
+    relocate 'com.github.benmanes', 'plan.com.github.benmanes'
+    relocate 'dev.vankka.dependencydownload', 'plan.dev.vankka.dependencydownload'
+
+    relocate 'com.maxmind', 'plan.com.maxmind'
+    relocate 'com.fasterxml', 'plan.com.fasterxml'
+    relocate 'com.zaxxer', 'plan.com.zaxxer'
+    relocate 'com.google.gson', 'plan.com.google.gson'
+    relocate 'com.google.errorprone', 'plan.com.google.errorprone'
+    relocate 'org.bstats', 'plan.org.bstats'
+
+    relocate 'org.eclipse.jetty', 'plan.org.eclipse.jetty'
+    relocate 'jakarta.servlet', 'plan.jakarta.servlet'
+    relocate 'javax.servlet', 'plan.javax.servlet'
+
+    relocate 'org.slf4j', 'plan.org.slf4j'
+
+    relocate 'org.json.simple', 'plan.org.json.simple'
+
+    mergeServiceFiles()
+}
+
+reobf {
+    shadowJar {}
+}
+
+//remapJar {
+//    dependsOn tasks.shadowJar
+//    mustRunAfter tasks.shadowJar
+//    inputFile = shadowJar.archiveFile.get()
+//    addNestedDependencies = true
+//
+//    destinationDirectory.set(file("$rootDir/builds/"))
+//    archiveBaseName.set('planForge')
+//    archiveClassifier.set('')
+//}
+//
+//shadowJar.finalizedBy(remapJar)

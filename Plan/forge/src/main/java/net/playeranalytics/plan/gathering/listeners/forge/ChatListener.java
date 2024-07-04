@@ -24,6 +24,8 @@ import com.djrapitops.plan.storage.database.transactions.events.StoreNicknameTra
 import com.djrapitops.plan.utilities.logging.ErrorContext;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.ServerChatEvent;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 
 import javax.inject.Inject;
@@ -60,11 +62,14 @@ public class ChatListener implements ForgeListener {
         this.errorLogger = errorLogger;
     }
 
-    public void onChat(ServerPlayer player) {
+    public void onChat(ServerChatEvent event) {
+        if (!isEnabled) {
+            return;
+        }
         try {
-            actOnChatEvent(player);
+            actOnChatEvent(event.getPlayer());
         } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(player).build());
+            errorLogger.error(e, ErrorContext.builder().related(event.getPlayer()).build());
         }
     }
 
@@ -85,12 +90,7 @@ public class ChatListener implements ForgeListener {
             return;
         }
 
-        ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
-            if (!isEnabled) {
-                return;
-            }
-            onChat(sender);
-        });
+        MinecraftForge.EVENT_BUS.addListener(this::onChat);
 
         this.enable();
         this.wasRegistered = true;

@@ -18,78 +18,78 @@ package net.playeranalytics.plan.commands.use;
 
 import com.djrapitops.plan.commands.use.CMDSender;
 import com.djrapitops.plan.commands.use.MessageBuilder;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import org.apache.commons.text.TextStringBuilder;
 
 import java.util.Collection;
 
-public class FabricMessageBuilder implements MessageBuilder {
+public class ForgeMessageBuilder implements MessageBuilder {
 
-    private final ServerCommandSource sender;
-    private final MutableText builder;
-    private final FabricMessageBuilder previous;
+    private final CommandSourceStack sender;
+    private final MutableComponent builder;
+    private final ForgeMessageBuilder previous;
 
-    public FabricMessageBuilder(ServerCommandSource sender) {
+    public ForgeMessageBuilder(CommandSourceStack sender) {
         this(sender, null);
     }
 
-    FabricMessageBuilder(ServerCommandSource sender, FabricMessageBuilder previous) {
+    ForgeMessageBuilder(CommandSourceStack sender, ForgeMessageBuilder previous) {
         this.sender = sender;
-        this.builder = Text.literal("");
+        this.builder = Component.literal("");
         this.previous = previous;
     }
 
     @Override
     public MessageBuilder addPart(String s) {
-        FabricMessageBuilder newBuilder = new FabricMessageBuilder(sender, this);
-        newBuilder.builder.append(Text.of(s));
+        ForgeMessageBuilder newBuilder = new ForgeMessageBuilder(sender, this);
+        newBuilder.builder.append(Component.literal(s));
         return newBuilder;
     }
 
     @Override
     public MessageBuilder newLine() {
-        builder.append(Text.of("\n"));
+        builder.append(Component.literal("\n"));
         return this;
     }
 
     @Override
     public MessageBuilder link(String url) {
-        builder.styled(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url)));
+        builder.withStyle(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url)));
         return this;
     }
 
     @Override
     public MessageBuilder command(String command) {
-        builder.styled(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command.charAt(0) == '/' ? command : '/' + command)));
+        builder.withStyle(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command.charAt(0) == '/' ? command : '/' + command)));
         return this;
     }
 
     @Override
     public MessageBuilder hover(String message) {
-        builder.styled(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(message))));
+        builder.withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(message))));
         return this;
     }
 
     @Override
     public MessageBuilder hover(String... lines) {
-        builder.styled(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(new TextStringBuilder().appendWithSeparators(lines, "\n").toString()))));
+        builder.withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(new TextStringBuilder().appendWithSeparators(lines, "\n").toString()))));
         return this;
     }
 
     @Override
     public MessageBuilder hover(Collection<String> lines) {
-        builder.styled(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal(new TextStringBuilder().appendWithSeparators(lines, "\n").toString()))));
+        builder.withStyle(style -> style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(new TextStringBuilder().appendWithSeparators(lines, "\n").toString()))));
         return this;
     }
 
     @Override
     public MessageBuilder indent(int amount) {
         for (int i = 0; i < amount; i++) {
-            builder.append(Text.of(" "));
+            builder.append(Component.literal(" "));
         }
         return this;
     }
@@ -103,7 +103,7 @@ public class FabricMessageBuilder implements MessageBuilder {
     @Override
     public void send() {
         if (previous == null) {
-            sender.sendFeedback(() -> builder, false);
+            sender.sendSuccess(builder, false);
         } else {
             previous.builder.append(builder);
             previous.send();

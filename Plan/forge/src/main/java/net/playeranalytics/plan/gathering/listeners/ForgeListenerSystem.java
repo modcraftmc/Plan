@@ -19,8 +19,10 @@ package net.playeranalytics.plan.gathering.listeners;
 import com.djrapitops.plan.PlanPlugin;
 import com.djrapitops.plan.capability.CapabilitySvc;
 import com.djrapitops.plan.gathering.listeners.ListenerSystem;
+import net.minecraftforge.common.MinecraftForge;
 import net.playeranalytics.plan.PlanForge;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnEnableEvent;
 import net.playeranalytics.plan.gathering.listeners.forge.*;
 import net.playeranalytics.plugin.server.Listeners;
 
@@ -84,7 +86,7 @@ public class ForgeListenerSystem extends ListenerSystem {
     @Override
     public void callEnableEvent(PlanPlugin plugin) {
         boolean isEnabled = plugin.isSystemEnabled();
-        PlanForgeEvents.ON_ENABLE.invoker().onEnable((PlanForge) plugin);
+        MinecraftForge.EVENT_BUS.post(new OnEnableEvent((PlanForge) plugin));
         CapabilitySvc.notifyAboutEnable(isEnabled);
     }
 }

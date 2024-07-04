@@ -18,11 +18,11 @@ package net.playeranalytics.plan.gathering;
 
 import com.djrapitops.plan.gathering.ServerSensor;
 import com.djrapitops.plan.gathering.domain.PluginMetadata;
-import net.fabricmc.loader.api.ModContainer;
-import net.fabricmc.loader.impl.FabricLoaderImpl;
-import net.minecraft.entity.Entity;
-import net.minecraft.server.dedicated.MinecraftDedicatedServer;
-import net.minecraft.server.world.ServerWorld;
+import com.sun.source.util.Plugin;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraftforge.fml.ModList;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -32,13 +32,13 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Singleton
-public class ForgeSensor implements ServerSensor<ServerWorld> {
+public class ForgeSensor implements ServerSensor<ServerLevel> {
 
-    private final MinecraftDedicatedServer server;
+    private final MinecraftServer server;
 
     @Inject
     public ForgeSensor(
-            MinecraftDedicatedServer server
+            MinecraftServer server
     ) {
         this.server = server;
     }
@@ -48,7 +48,7 @@ public class ForgeSensor implements ServerSensor<ServerWorld> {
         //Returns the ticks per second of the last 100 ticks
         double totalTickLength = 0;
         int count = 0;
-        for (long tickLength : server.getTickTimes()) {
+        for (long tickLength : server.tickTimes) {
             if (tickLength == 0) continue; // Ignore uninitialized values in array
             totalTickLength += Math.max(tickLength, TimeUnit.MILLISECONDS.toNanos(50));
             count++;
@@ -61,22 +61,22 @@ public class ForgeSensor implements ServerSensor<ServerWorld> {
     }
 
     @Override
-    public Iterable<ServerWorld> getWorlds() {
-        return server.getWorlds();
+    public Iterable<ServerLevel> getWorlds() {
+        return server.getAllLevels();
     }
 
     @Override
-    public int getEntityCount(ServerWorld world) {
+    public int getEntityCount(ServerLevel world) {
         int entities = 0;
-        for (Entity ignored : world.iterateEntities()) {
+        for (Entity ignored : world.getEntities().getAll()) {
             entities++;
         }
         return entities;
     }
 
     @Override
-    public int getChunkCount(ServerWorld world) {
-        return world.getChunkManager().getLoadedChunkCount();
+    public int getChunkCount(ServerLevel world) {
+        return world.getChunkSource().getLoadedChunksCount();
     }
 
     @Override
@@ -86,7 +86,7 @@ public class ForgeSensor implements ServerSensor<ServerWorld> {
 
     @Override
     public int getOnlinePlayerCount() {
-        return server.getCurrentPlayerCount();
+        return server.getPlayerCount();
     }
 
     @Override
@@ -96,11 +96,10 @@ public class ForgeSensor implements ServerSensor<ServerWorld> {
 
     @Override
     public List<PluginMetadata> getInstalledPlugins() {
-        return FabricLoaderImpl.INSTANCE.getMods().stream()
-                .map(ModContainer::getMetadata)
+        return ModList.get().getMods().stream()
                 .map(metadata -> new PluginMetadata(
-                        Optional.ofNullable(metadata.getName()).orElse(metadata.getId()),
-                        metadata.getVersion().getFriendlyString()))
+                        Optional.ofNullable(metadata.getDisplayName()).orElse(metadata.getModId()),
+                        metadata.getVersion().getQualifier()))
                 .toList();
     }
 }

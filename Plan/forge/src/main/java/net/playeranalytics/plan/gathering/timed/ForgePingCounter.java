@@ -33,6 +33,8 @@ import com.djrapitops.plan.storage.database.DBSystem;
 import com.djrapitops.plan.storage.database.transactions.events.PingStoreTransaction;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 import net.playeranalytics.plugin.scheduling.RunnableFactory;
 import net.playeranalytics.plugin.scheduling.TimeAmount;
@@ -77,8 +79,8 @@ public class ForgePingCounter extends TaskSystem.Task implements ForgeListener {
         this.server = server;
         startRecording = new ConcurrentHashMap<>();
         playerHistory = new HashMap<>();
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, minecraftServer) -> onPlayerJoin(handler.player));
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, minecraftServer) -> onPlayerQuit(handler.player));
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerJoin);
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerQuit);
     }
 
     @Override
@@ -148,7 +150,7 @@ public class ForgePingCounter extends TaskSystem.Task implements ForgeListener {
         return player.latency;
     }
 
-    public void onPlayerJoin(ServerPlayer player) {
+    public void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!this.isEnabled) {
             return;
         }
@@ -157,15 +159,15 @@ public class ForgePingCounter extends TaskSystem.Task implements ForgeListener {
         if (pingDelayMs >= TimeUnit.HOURS.toMillis(2L)) {
             return;
         }
-        startRecording.put(player.getUUID(), System.currentTimeMillis() + pingDelayMs);
+        startRecording.put(event.getEntity().getUUID(), System.currentTimeMillis() + pingDelayMs);
     }
 
-    public void onPlayerQuit(ServerPlayer player) {
+    public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!this.isEnabled) {
             return;
         }
 
-        removePlayer(player);
+        removePlayer(((ServerPlayer) event.getEntity()));
     }
 
     public void clear() {

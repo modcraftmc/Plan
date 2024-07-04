@@ -29,8 +29,12 @@ import com.djrapitops.plan.utilities.java.ThreadContextClassLoaderSwap;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.server.ServerAboutToStartEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.loading.FMLPaths;
 import net.playeranalytics.plan.commands.ForgeCommandManager;
 import net.playeranalytics.plan.identification.properties.ForgeServerProperties;
 import net.playeranalytics.plugin.ForgePlatformLayer;
@@ -88,7 +92,7 @@ public class PlanForge implements PlanPlugin {
 
     @Override
     public void onEnable() {
-        PlanForgeComponent component = DaggerPlanFabricComponent.builder()
+        PlanForgeComponent component = DaggerPlanForgeComponent.builder()
                 .plan(this)
                 .abstractionLayer(abstractionLayer)
                 .server(server)
@@ -153,7 +157,7 @@ public class PlanForge implements PlanPlugin {
 
     @Override
     public File getDataFolder() {
-        return FabricLoader.getInstance().getConfigDir().resolve("plan").toFile();
+        return FMLPaths.CONFIGDIR.get().resolve("plan").toFile();
     }
 
     public PlanForge() {
@@ -162,15 +166,26 @@ public class PlanForge implements PlanPlugin {
         runnableFactory = abstractionLayer.getRunnableFactory();
 
         MinecraftForge.EVENT_BUS.addListener(this::onServerStarting);
+        MinecraftForge.EVENT_BUS.addListener(this::onServerSopping);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onCommandRegister);
 
        // CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> fabricCommandManager = new FabricCommandManager(dispatcher, this, errorLogger));
 
        // ServerLifecycleEvents.SERVER_STOPPING.register(server -> onDisable());
     }
 
-    public void onServerStarting(ServerStartingEvent event) {
+    public void onServerStarting(ServerAboutToStartEvent event) {
         this.server = event.getServer();
         onEnable();
+    }
+
+    public void onServerSopping(ServerStoppedEvent event) {
+        this.onDisable();
+    }
+
+    public void onCommandRegister(RegisterCommandsEvent event) {
+        fabricCommandManager = new ForgeCommandManager(event.getDispatcher(), this, errorLogger);
     }
 
     public MinecraftServer getServer() {

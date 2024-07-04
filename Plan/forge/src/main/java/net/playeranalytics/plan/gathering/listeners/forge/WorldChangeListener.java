@@ -25,6 +25,8 @@ import com.djrapitops.plan.storage.database.transactions.events.StoreWorldNameTr
 import com.djrapitops.plan.utilities.logging.ErrorContext;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.EntityTravelToDimensionEvent;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 
 import javax.inject.Inject;
@@ -56,11 +58,14 @@ public class WorldChangeListener implements ForgeListener {
         this.errorLogger = errorLogger;
     }
 
-    public void onWorldChange(ServerPlayer player) {
+    public void onWorldChange(EntityTravelToDimensionEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
         try {
-            actOnEvent(player);
+            actOnEvent(((ServerPlayer) event.getEntity()));
         } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(getClass(), player).build());
+            errorLogger.error(e, ErrorContext.builder().related(getClass(), event.getEntity()).build());
         }
     }
 
@@ -85,12 +90,7 @@ public class WorldChangeListener implements ForgeListener {
             return;
         }
 
-        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            onWorldChange(player);
-        });
+        MinecraftForge.EVENT_BUS.addListener(this::onWorldChange);
 
         this.enable();
         this.wasRegistered = true;

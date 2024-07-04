@@ -30,12 +30,18 @@ import com.djrapitops.plan.storage.database.transactions.events.KickStoreTransac
 import com.djrapitops.plan.utilities.logging.ErrorContext;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import com.mojang.authlib.GameProfile;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.playeranalytics.plan.gathering.ForgePlayerPositionTracker;
 import net.playeranalytics.plan.gathering.domain.ForgePlayerData;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnHandshakeEvent;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnKickedEvent;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnLoginEvent;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -88,48 +94,29 @@ public class PlayerOnlineListener implements ForgeListener {
             return;
         }
 
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            onPlayerJoin(handler.player);
-        });
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            beforePlayerQuit(handler.player);
-            onPlayerQuit(handler.player);
-        });
-        PlanForgeEvents.ON_KICKED.register((source, targets, reason) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            for (ServerPlayer target : targets) {
-                onPlayerKick(target);
-            }
-        });
-        PlanForgeEvents.ON_LOGIN.register((address, profile, reason) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            onPlayerLogin(address, profile, reason != null);
-        });
-        PlanForgeEvents.ON_HANDSHAKE.register(packet -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            onHandshake(packet);
-        });
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerJoin);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerQuit);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerKick);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onPlayerLogin);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onHandshake);
 
         this.enable();
         this.wasRegistered = true;
     }
 
-    private void onHandshake(HandshakeC2SPacket packet) {
+
+    private void onHandshake(OnHandshakeEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
+
         try {
-            if (packet.intendedState() == ConnectionIntent.LOGIN) {
-                String address = joinAddressValidator.sanitize(packet.address());
+            if (event.packet().getIntention() == ConnectionProtocol.LOGIN) {
+                String address = joinAddressValidator.sanitize(event.packet().getHostName());
                 joinAddress.set(address);
             }
         } catch (Exception e) {
@@ -137,9 +124,13 @@ public class PlayerOnlineListener implements ForgeListener {
         }
     }
 
-    public void onPlayerLogin(SocketAddress address, GameProfile profile, boolean banned) {
+    public void onPlayerLogin(OnLoginEvent event) {
+        boolean banned = event.component() != null;
+        if (!this.isEnabled) {
+            return;
+        }
         try {
-            UUID playerUUID = profile.getId();
+            UUID playerUUID = event.gameProfile().getId();
             ServerUUID serverUUID = serverInfo.getServerUUID();
 
             String playerJoinAddress = joinAddress.get();
@@ -149,28 +140,36 @@ public class PlayerOnlineListener implements ForgeListener {
 
             dbSystem.getDatabase().executeTransaction(new BanStatusTransaction(playerUUID, serverUUID, banned));
         } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(getClass(), address, profile, banned).build());
+            errorLogger.error(e, ErrorContext.builder().related(getClass(), event.address(), event.gameProfile(), banned).build());
         }
     }
 
-    public void onPlayerKick(ServerPlayer player) {
-        try {
-            UUID uuid = player.getUUID();
-            if (ForgeAFKListener.afkTracker.isAfk(uuid)) {
-                return;
+    public void onPlayerKick(OnKickedEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
+        for (ServerPlayer target : event.targets()) {
+            try {
+                UUID uuid = target.getUUID();
+                if (ForgeAFKListener.afkTracker.isAfk(uuid)) {
+                    return;
+                }
+
+                dbSystem.getDatabase().executeTransaction(new KickStoreTransaction(uuid));
+            } catch (Exception e) {
+                errorLogger.error(e, ErrorContext.builder().related(getClass(), target).build());
             }
-
-            dbSystem.getDatabase().executeTransaction(new KickStoreTransaction(uuid));
-        } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(getClass(), player).build());
         }
     }
 
-    public void onPlayerJoin(ServerPlayer player) {
+    public void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
         try {
-            actOnJoinEvent(player);
+            actOnJoinEvent(((ServerPlayer) event.getEntity()));
         } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(getClass(), player).build());
+            errorLogger.error(e, ErrorContext.builder().related(getClass(), event.getEntity()).build());
         }
     }
 
@@ -196,11 +195,15 @@ public class PlayerOnlineListener implements ForgeListener {
                 .build());
     }
 
-    public void onPlayerQuit(ServerPlayer player) {
+    public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
+        beforePlayerQuit(((ServerPlayer) event.getEntity()));
         try {
-            actOnQuitEvent(player);
+            actOnQuitEvent(((ServerPlayer) event.getEntity()));
         } catch (Exception e) {
-            errorLogger.error(e, ErrorContext.builder().related(getClass(), player).build());
+            errorLogger.error(e, ErrorContext.builder().related(getClass(), event.getEntity()).build());
         }
     }
 

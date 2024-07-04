@@ -16,28 +16,32 @@
  */
 package net.playeranalytics.plan.gathering.listeners.events.mixin;
 
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.world.GameMode;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.GameType;
+import net.minecraftforge.common.MinecraftForge;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnGamemodeChangeEvent;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnKickedEvent;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnKilledEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ServerPlayerEntity.class)
+@Mixin(ServerPlayer.class)
 public class ServerPlayerEntityMixin {
 
-    @Inject(method = "changeGameMode", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
-    public void onGameModeChanged(GameMode gameMode, CallbackInfoReturnable<Boolean> cir) {
-        PlanForgeEvents.ON_GAMEMODE_CHANGE.invoker().onGameModeChange((ServerPlayerEntity) (Object) this, gameMode);
+    @Inject(method = "setGameMode", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerGamePacketListenerImpl;send(Lnet/minecraft/network/protocol/Packet;)V"))
+    public void onGameModeChanged(GameType gameMode, CallbackInfoReturnable<Boolean> cir) {
+        MinecraftForge.EVENT_BUS.post(new OnGamemodeChangeEvent((ServerPlayer) (Object) this, gameMode));
     }
 
-    @Inject(method = "onDeath", at = @At(value = "TAIL"))
+    @Inject(method = "die", at = @At(value = "TAIL"))
     public void onKillSelf(DamageSource source, CallbackInfo ci) {
-        if (source.getAttacker() == null) {
-            PlanForgeEvents.ON_KILLED.invoker().onKilled((ServerPlayerEntity) (Object) this, null);
+        if (source.getEntity() == null) {
+            MinecraftForge.EVENT_BUS.post(new OnKilledEvent((ServerPlayer) (Object) this, null));
         }
     }
 

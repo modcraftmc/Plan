@@ -18,21 +18,20 @@ package net.playeranalytics.plan.gathering.listeners.events.mixin;
 
 import com.djrapitops.plan.commands.use.*;
 import com.mojang.authlib.GameProfile;
-import net.minecraft.entity.Entity;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.playeranalytics.plan.commands.ForgeCommandManager;
-import net.playeranalytics.plan.commands.use.FabricMessageBuilder;
+import net.playeranalytics.plan.commands.use.ForgeMessageBuilder;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
 
-@Mixin(ServerCommandSource.class)
+@Mixin(CommandSourceStack.class)
 public abstract class ServerCommandSourceMixin implements CMDSender {
 
     @Override
@@ -46,7 +45,7 @@ public abstract class ServerCommandSourceMixin implements CMDSender {
     }
 
     @Shadow
-    public abstract void sendFeedback(Supplier<Text> supplier, boolean broadcastToOps);
+    public abstract void sendSuccess(Component supplier, boolean broadcastToOps);
 
     @Shadow
     @Nullable
@@ -54,27 +53,27 @@ public abstract class ServerCommandSourceMixin implements CMDSender {
 
     @Override
     public MessageBuilder buildMessage() {
-        return new FabricMessageBuilder((ServerCommandSource) (Object) this);
+        return new ForgeMessageBuilder((CommandSourceStack) (Object) this);
     }
 
     @Override
     public Optional<String> getPlayerName() {
-        return getPlayer().map(ServerPlayerEntity::getGameProfile).map(GameProfile::getName);
+        return getPlayer().map(ServerPlayer::getGameProfile).map(GameProfile::getName);
     }
 
     @Override
     public boolean hasPermission(String permission) {
-        return ForgeCommandManager.checkPermission((ServerCommandSource) (Object) this, permission);
+        return ForgeCommandManager.checkPermission((CommandSourceStack) (Object) this, permission);
     }
 
     @Override
     public Optional<UUID> getUUID() {
-        return getPlayer().map(Entity::getUuid);
+        return getPlayer().map(Entity::getUUID);
     }
 
     @Override
     public void send(String message) {
-        this.sendFeedback(() -> Text.literal(message), false);
+        this.sendSuccess(Component.literal(message), false);
     }
 
     @Override
@@ -86,8 +85,8 @@ public abstract class ServerCommandSourceMixin implements CMDSender {
         return getEntity() == null;
     }
 
-    private Optional<ServerPlayerEntity> getPlayer() {
-        if (getEntity() instanceof ServerPlayerEntity player) {
+    private Optional<ServerPlayer> getPlayer() {
+        if (getEntity() instanceof ServerPlayer player) {
             return Optional.of(player);
         }
         return Optional.empty();

@@ -31,12 +31,9 @@ public class ForgeServerProperties extends ServerProperties {
                 "Forge",
                 server.getPort(),
                 server.getServerVersion(),
-                FabricLoader.getInstance().getModContainer("fabric").map(container -> container.getMetadata().getVersion().getFriendlyString()).orElse("Unknown") +
-                        " (API), " +
-                        FabricLoader.getInstance().getModContainer("fabricloader").map(modContainer -> modContainer.getMetadata().getVersion().getFriendlyString()).orElse("Unknown") +
-                        " (loader)",
-                () -> (server.getServerIp() == null) ? "" : server.getServerIp(),
-                server.getProperties().maxPlayers
+                "dev",
+                () -> (server.getLocalIp() == null) ? "" : server.getLocalIp(),
+                server.getMaxPlayers()
         );
     }
 }

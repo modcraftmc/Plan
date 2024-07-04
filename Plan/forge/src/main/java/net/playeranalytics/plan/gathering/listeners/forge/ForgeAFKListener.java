@@ -21,9 +21,14 @@ import com.djrapitops.plan.settings.config.PlanConfig;
 import com.djrapitops.plan.utilities.logging.ErrorContext;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.ServerChatEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.playeranalytics.plan.commands.ForgeCommandManager;
 import net.playeranalytics.plan.gathering.listeners.ForgeListener;
 import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnCommandEvent;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnMoveEvent;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -80,11 +85,13 @@ public class ForgeAFKListener implements ForgeListener {
     }
 
     private boolean checkPermission(ServerPlayer player, String permission) {
-        if (ForgeCommandManager.isPermissionsApiAvailable()) {
-            return Permissions.check(player, permission);
-        } else {
-            return false;
-        }
+        return false;
+        //TODO: impl perms
+//        if (ForgeCommandManager.isPermissionsApiAvailable()) {
+//            return Permissions.check(player, permission);
+//        } else {
+//            return false;
+//        }
     }
 
     @Override
@@ -93,38 +100,51 @@ public class ForgeAFKListener implements ForgeListener {
             return;
         }
 
-        ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
-            if (!isEnabled) {
-                return;
-            }
-            event(sender);
-        });
-        PlanForgeEvents.ON_COMMAND.register((handler, command) -> {
-            if (!isEnabled) {
-                return;
-            }
-            event(handler.player);
-            boolean isAfkCommand = command.toLowerCase().startsWith("afk");
-            if (isAfkCommand) {
-                UUID uuid = handler.player.getUuid();
-                afkTracker.usedAfkCommand(uuid, System.currentTimeMillis());
-            }
-        });
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            ignorePermissionInfo.remove(handler.player.getUuid());
-        });
-        PlanForgeEvents.ON_MOVE.register((handler, packet) -> {
-            if (!this.isEnabled) {
-                return;
-            }
-            event(handler.player);
-        });
+
+        MinecraftForge.EVENT_BUS.addListener(this::onChat);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onCommand);
+
+        MinecraftForge.EVENT_BUS.addListener(this::onDisconnect);
+
+
+        MinecraftForge.EVENT_BUS.addListener(this::onMove);
 
         this.enable();
         this.wasRegistered = true;
+    }
+
+    public void onMove(OnMoveEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
+        event(event.serverGamePacketListener().player);
+    }
+
+    public void onDisconnect(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!this.isEnabled) {
+            return;
+        }
+        ignorePermissionInfo.remove(((ServerPlayer) event.getEntity()).getUUID());
+    }
+
+    public void onChat(ServerChatEvent event) {
+        if (!isEnabled) {
+            return;
+        }
+        event(event.getPlayer());
+    }
+
+    public void onCommand(OnCommandEvent event) {
+        if (!isEnabled) {
+            return;
+        }
+        event(event.serverGamePacketListener().player);
+        boolean isAfkCommand = event.command().toLowerCase().startsWith("afk");
+        if (isAfkCommand) {
+            UUID uuid = event.serverGamePacketListener().player.getUUID();
+            afkTracker.usedAfkCommand(uuid, System.currentTimeMillis());
+        }
     }
 
 

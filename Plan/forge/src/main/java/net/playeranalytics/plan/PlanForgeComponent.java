@@ -27,7 +27,7 @@ import com.djrapitops.plan.modules.SystemObjectProvidingModule;
 import com.djrapitops.plan.utilities.logging.ErrorLogger;
 import dagger.BindsInstance;
 import dagger.Component;
-import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.MinecraftServer;
 import net.playeranalytics.plan.identification.properties.ForgeServerProperties;
 import net.playeranalytics.plan.modules.forge.ForgeServerPropertiesModule;
 import net.playeranalytics.plan.modules.forge.ForgeSuperClassBindingModule;
@@ -72,7 +72,7 @@ public interface PlanForgeComponent {
         Builder abstractionLayer(PlatformAbstractionLayer abstractionLayer);
 
         @BindsInstance
-        Builder server(DedicatedServer server);
+        Builder server(MinecraftServer server);
 
         @BindsInstance
         Builder serverProperties(ForgeServerProperties serverProperties);

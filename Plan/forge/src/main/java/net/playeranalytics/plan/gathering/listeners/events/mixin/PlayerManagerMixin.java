@@ -17,9 +17,10 @@
 package net.playeranalytics.plan.gathering.listeners.events.mixin;
 
 import com.mojang.authlib.GameProfile;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.text.Text;
-import net.playeranalytics.plan.gathering.listeners.events.PlanForgeEvents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.players.PlayerList;
+import net.minecraftforge.common.MinecraftForge;
+import net.playeranalytics.plan.gathering.listeners.events.impl.OnLoginEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -27,12 +28,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.net.SocketAddress;
 
-@Mixin(PlayerManager.class)
+@Mixin(PlayerList.class)
 public class PlayerManagerMixin {
 
-    @Inject(method = "checkCanJoin", at = @At(value = "TAIL"))
-    public void onLogin(SocketAddress address, GameProfile profile, CallbackInfoReturnable<Text> cir) {
-        PlanForgeEvents.ON_LOGIN.invoker().onLogin(address, profile, cir.getReturnValue());
+    @Inject(method = "canPlayerLogin", at = @At(value = "TAIL"))
+    public void onLogin(SocketAddress address, GameProfile profile, CallbackInfoReturnable<Component> cir) {
+        MinecraftForge.EVENT_BUS.post(new OnLoginEvent(address, profile, cir.getReturnValue()));
     }
 
 }
