@@ -8,6 +8,8 @@ pluginManagement {
             name = 'Sponge'
             url = "https://repo.spongepowered.org/repository/maven-public/"
         }
+        maven { url "https://maven.architectury.dev/" }
+        maven { url "https://files.minecraftforge.net/maven/" }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -17,14 +19,14 @@ rootProject.name = 'Plan'
 
 include 'api'
 include 'common'
-include 'bukkit'
-include 'sponge'
-include 'nukkit'
-include 'bungeecord'
-include 'velocity'
-include 'plugin'
+//include 'bukkit'
+//include 'sponge'
+//include 'nukkit'
+//include 'bungeecord'
+//include 'velocity'
+//include 'plugin'
 include 'extensions'
 include 'extensions:adventure'
-include 'fabric'
-include 'folia'
+//include 'fabric'
+//include 'folia'
 include 'forge'

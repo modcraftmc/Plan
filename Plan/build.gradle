@@ -17,7 +17,12 @@ plugins {
     id "jacoco"
     id "checkstyle"
     id "org.sonarqube" version "5.0.0.4638"
-    id 'fabric-loom' version '1.6-SNAPSHOT' apply false
+    id 'dev.architectury.loom' version '1.6-SNAPSHOT' apply false
+    id 'architectury-plugin' version '3.4-SNAPSHOT'
+}
+
+architectury {
+    minecraft = "1.19.2"
 }
 
 apply plugin: 'nebula-aggregate-javadocs'
@@ -60,9 +65,15 @@ subprojects {
     apply plugin: "java-library"
     apply plugin: "maven-publish"
 
-    // Report plugins
-    apply plugin: "checkstyle"
-    apply plugin: "jacoco"
+    if (project.name == "forge") {
+        apply plugin: 'dev.architectury.loom'
+        apply plugin: 'architectury-plugin'
+
+
+        loom {
+            silentMojangMappingsLicense()
+        }
+    }
 
     compileJava {
         options.release = 11
@@ -125,6 +136,13 @@ subprojects {
     }
 
     dependencies {
+
+        println "Setup: ${project.name}";
+        if (project.name == 'forge') {
+            minecraft "net.minecraft:minecraft:1.19.2"
+            mappings loom.officialMojangMappings()
+        }
+
         // Dependency Injection used across the project
         shadow "com.google.dagger:dagger:$daggerVersion"
         annotationProcessor "com.google.dagger:dagger-compiler:$daggerVersion"
